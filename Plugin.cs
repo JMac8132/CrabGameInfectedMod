@@ -116,7 +116,6 @@ namespace InfectedMod
             {
                 gameState = 6;
                 prevGameState = 6;
-                
             }
 
             //Debug.Log(gameState.ToString());
@@ -293,7 +292,7 @@ namespace InfectedMod
                             maxPlayers = 40;
                             break;
                         case 32:
-                            minPlayers = 1;
+                            minPlayers = 0;
                             maxPlayers = 10;
                             break;
                         case 29:
@@ -313,15 +312,15 @@ namespace InfectedMod
                             maxPlayers = 40;
                             break;
                         case 35:
-                            minPlayers = 1;
+                            minPlayers = 0;
                             maxPlayers = 4;
                             break;
                         case 36:
-                            minPlayers = 1;
+                            minPlayers = 0;
                             maxPlayers = 5;
                             break;
                         case 18:
-                            minPlayers = 1;
+                            minPlayers = 0;
                             maxPlayers = 5;
                             break;
                     }
@@ -348,7 +347,7 @@ namespace InfectedMod
                         int maxPlayers = int.Parse(match.Groups["max"].Value);
                         int roundTime = int.Parse(match.Groups["round"].Value);
 
-                        MapInfo mapInfo = new MapInfo
+                        MapInfo mapInfo = new()
                         {
                             name = mapName,
                             id = id,
@@ -483,21 +482,6 @@ namespace InfectedMod
                 canStartGame = false;
                 Debug.Log("Game Started");
             }
-
-            if (GetModeID() == 4)
-            {
-                // Kill Infected End Of Round If Still Alive
-                if (gameState == 5 || gameState == 6 && survivorPlayers.Count > 0)
-                {
-                    foreach (ulong id in infectedPlayers)
-                    {
-                        if (!GameManager.Instance.activePlayers[id].dead)
-                        {
-                            GameServer.PlayerDied(id, 1, Vector3.zero);
-                        }
-                    }
-                }
-            }
         }
 
         [HarmonyPatch(typeof(GameMode), nameof(GameMode.Update))]
@@ -509,72 +493,93 @@ namespace InfectedMod
             gameTimer = __instance.freezeTimer.field_Private_Single_0;
             CheckGameOver();
 
-            if (gameState == 4 && GetModeID() == 4)
+            if (GetModeID() == 4)
             {
-                // Infected Effect
-                foreach (ulong id in infectedPlayers)
+                if (gameState == 4)
                 {
-                    ServerSend.PlayerDamage(id, id, 0, new Vector3(0, 0, 0), 5);
-                }
-
-                // Pick New Infected
-                if (infectedPlayers.Count == 0 && survivorPlayers.Count > 1)
-                {
-                    ulong randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
-                    InfectPlayer(randomPlayer);
-                    ServerSend.SendChatMessage(1, GameManager.Instance.activePlayers[randomPlayer].username.ToString() + " is now infected");
-                    firstPersonInfectedID = randomPlayer;
-                    firstPersonInfectedPos = GetPlayerRigidBody(randomPlayer).position;
-                    freezeTimer = 3f;
-                    isInfectedPlayerFrozen = true;
-                    Debug.Log("Picked a new infected player");
-                }
-
-                // Freeze Infected
-                freezeTimer -= Time.deltaTime;
-                if (isInfectedPlayerFrozen)
-                {
-                    ServerSend.RespawnPlayer(firstPersonInfectedID, firstPersonInfectedPos);
-
-                    if (freezeTimer <= 0)
+                    // Check If Players Are Glitching
+                    foreach (ulong id in alivePlayers)
                     {
-                        Debug.Log("Infected Player Unfrozen");
-                        ServerSend.SendChatMessage(1, "The infected is unfrozen, RUN!");
-                        isInfectedPlayerFrozen = false; 
+                        CheckPosition(id);
                     }
-                }
 
-                // Afk Check
-                afkTimer -= Time.deltaTime;
-                if (afkTimer <= 0 && canAfkCheck)
-                {
-                    if (afkPlayerRotation == GetPlayerRotation(afkPlayerID))
+                    // Infected Effect
+                    foreach (ulong id in infectedPlayers)
                     {
-                        afkPlayers.Add(afkPlayerID);
-                        GameServer.PlayerDied(afkPlayerID, 1, Vector3.zero);
-                        ServerSend.SendChatMessage(1, GameManager.Instance.activePlayers[afkPlayerID].username.ToString() + " was killed for being afk");
+                        ServerSend.PlayerDamage(id, id, 0, Vector3.zero, 5);
+                    }
+
+                    // Pick New Infected
+                    if (infectedPlayers.Count == 0 && survivorPlayers.Count > 1)
+                    {
                         ulong randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
-                        while (toggleAfk && randomPlayer == GetMyID())
-                        {
-                            randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
-                        }
                         InfectPlayer(randomPlayer);
-                        ServerSend.SendChatMessage(1, GameManager.Instance.activePlayers[randomPlayer].username.ToString() + " is now infected");
+                        ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[randomPlayer].username} is now infected");
                         firstPersonInfectedID = randomPlayer;
                         firstPersonInfectedPos = GetPlayerRigidBody(randomPlayer).position;
                         freezeTimer = 3f;
                         isInfectedPlayerFrozen = true;
-                        canAfkCheck = true;
-                        afkTimer = 10f;
-                        afkPlayerID = randomPlayer;
-                        afkPlayerRotation = GetPlayerRotation(randomPlayer);
+                        Debug.Log("Picked a new infected player");
                     }
-                    else canAfkCheck = false;
+
+                    // Freeze Infected
+                    freezeTimer -= Time.deltaTime;
+                    if (isInfectedPlayerFrozen)
+                    {
+                        ServerSend.RespawnPlayer(firstPersonInfectedID, firstPersonInfectedPos);
+
+                        if (freezeTimer <= 0)
+                        {
+                            Debug.Log("Infected Player Unfrozen");
+                            ServerSend.SendChatMessage(1, "The infected is unfrozen, RUN!");
+                            isInfectedPlayerFrozen = false;
+                        }
+                    }
+
+                    // Afk Check
+                    afkTimer -= Time.deltaTime;
+                    if (afkTimer <= 0 && canAfkCheck)
+                    {
+                        if (afkPlayerRotation == GetPlayerRotation(afkPlayerID))
+                        {
+                            afkPlayers.Add(afkPlayerID);
+                            GameServer.PlayerDied(afkPlayerID, 1, Vector3.zero);
+                            ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[afkPlayerID].username} was killed for being afk");
+                            ulong randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
+                            while (toggleAfk && randomPlayer == GetMyID())
+                            {
+                                randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
+                            }
+                            InfectPlayer(randomPlayer);
+                            ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[randomPlayer].username} is now infected");
+                            firstPersonInfectedID = randomPlayer;
+                            firstPersonInfectedPos = GetPlayerRigidBody(randomPlayer).position;
+                            freezeTimer = 3f;
+                            isInfectedPlayerFrozen = true;
+                            canAfkCheck = true;
+                            afkTimer = 10f;
+                            afkPlayerID = randomPlayer;
+                            afkPlayerRotation = GetPlayerRotation(randomPlayer);
+                        }
+                        else canAfkCheck = false;
+                    }
+
+                    
                 }
 
-                foreach (ulong id in alivePlayers)
+                if (gameState == 5 || gameState == 6)
                 {
-                    CheckPosition(id);
+                    // Kill Infected End Of Round If Still Alive
+                    if (survivorPlayers.Count > 0)
+                    {
+                        foreach (ulong id in infectedPlayers)
+                        {
+                            if (!GameManager.Instance.activePlayers[id].dead)
+                            {
+                                GameServer.PlayerDied(id, 1, Vector3.zero);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -634,7 +639,7 @@ namespace InfectedMod
 
         [HarmonyPatch(typeof(ServerSend), nameof(ServerSend.SendWinner))]
         [HarmonyPrefix]
-        public static bool ServerSendSendWinner(ServerSend __instance)
+        public static bool ServerSendSendWinner()
         {
             if (!IsHost() || GetModeID() != 4) return true;
 
@@ -648,13 +653,12 @@ namespace InfectedMod
                 GameLoop.Instance.RestartLobby();
                 Debug.Log("Skipped Win Screen");
             }
-
             return false;
         }
 
         [HarmonyPatch(typeof(GameLoop), nameof(GameLoop.RestartLobby))]
         [HarmonyPrefix]
-        public static bool GameLoopRestartLobby(ServerSend __instance)
+        public static bool GameLoopRestartLobby()
         {
             if (!IsHost() || GetModeID() != 4) return true;
 
@@ -672,7 +676,12 @@ namespace InfectedMod
         public static void GameManagerPlayerDied(ulong param_1)
         {
             if (!IsHost() || GetModeID() != 4) return;
-            if (afkPlayers.Contains(param_1) || gameState != 4 || (param_1 == GetMyID() && toggleAfk)) return;
+            if (afkPlayers.Contains(param_1) || gameState != 4) return;
+            if (param_1 == GetMyID() && toggleAfk && survivorPlayers.Contains(GetMyID()))
+            {
+                survivorPlayers.Remove(GetMyID());
+                return;
+            }
 
             if (infectedPlayers.Contains(param_1))
             {
@@ -681,7 +690,7 @@ namespace InfectedMod
             else if (!infectedPlayers.Contains(param_1))
             {
                 InfectPlayer(param_1);
-                ServerSend.SendChatMessage(1, GameManager.Instance.activePlayers[param_1].username.ToString() + " died and is now infected");
+                ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[param_1].username} died and is now infected");
                 if (survivorPlayers.Count != 0)
                 {
                     GameServer.Instance.QueueRespawn(param_1, 3);
@@ -703,7 +712,7 @@ namespace InfectedMod
                     if (infectedPlayers.Contains(param_1) && !infectedPlayers.Contains(param_2))
                     {
                         InfectPlayer(param_2);
-                        ServerSend.SendChatMessage(1, GameManager.Instance.activePlayers[param_1].username.ToString() + " infected " + GameManager.Instance.activePlayers[param_2].username.ToString());
+                        ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[param_1].username} infected {GameManager.Instance.activePlayers[param_2].username}");
                     }
                 }
             }
@@ -730,8 +739,7 @@ namespace InfectedMod
             }
 
             InfectPlayer(randomPlayer);
-            ServerSend.SendChatMessage(1, GameManager.Instance.activePlayers[randomPlayer].username.ToString() + " is infected");
-
+            ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[randomPlayer].username} is infected");
             firstPersonInfectedID = randomPlayer;
             firstPersonInfectedPos = GetPlayerRigidBody(firstPersonInfectedID).position;
             freezeTimer = 3f;
@@ -742,11 +750,11 @@ namespace InfectedMod
             afkPlayerID = randomPlayer;
             afkPlayerRotation = GetPlayerRotation(randomPlayer);
 
-            if (toggleAfk && alivePlayers.Count > 2)
+            if (toggleAfk && alivePlayers.Count > 2 && !GameManager.Instance.activePlayers[GetMyID()].dead)
             {
                 afkPlayers.Add(GetMyID());
                 survivorPlayers.Remove(GetMyID());
-                //GameServer.PlayerDied(GetMyID(), 1, Vector3.zero);
+                GameServer.PlayerDied(GetMyID(), 1, Vector3.zero);
             }
             return false;
         }
