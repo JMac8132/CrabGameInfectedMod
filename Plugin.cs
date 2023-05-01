@@ -244,91 +244,45 @@ namespace InfectedMod
             if (!File.Exists(path))
             {
                 Debug.Log("Trying To Create File");
+
+                Dictionary<int, (int min, int max)> mapLimits = new()
+                {
+                    { 0,  (5, 40) },
+                    { 3,  (5, 40) },
+                    { 7,  (5, 40) },
+                    { 15, (5, 40) },
+                    { 18, (0, 5)  },
+                    { 20, (5, 40) },
+                    { 29, (5, 40) },
+                    { 32, (0, 10) },
+                    { 35, (0, 5)  },
+                    { 36, (0, 5)  },
+                    { 55, (5, 40) },
+                    { 56, (5, 40) },
+                };
+
                 using (StreamWriter writer = new(path))
                 {
                     Map[] mapArray = MapManager.Instance.maps;
                     foreach (var map in mapArray)
                     {
+                        int id = map.id;
+                        (int min, int max) = mapLimits.ContainsKey(id) ? mapLimits[id] : (0, 40);
+
                         MapInfo mapInfo = new()
                         {
                             name = map.mapName,
-                            id = map.id,
-                            minPlayers = 0,
-                            maxPlayers = 40,
+                            id = id,
+                            minPlayers = min,
+                            maxPlayers = max,
                             roundTime = 70,
                         };
-                        mapDictionary.Add(map.id, mapInfo);
+                        mapDictionary.Add(id, mapInfo);
 
                         writer.WriteLine($"Map Name = {map.mapName}; Map ID = {map.id}; Min Players = {mapInfo.minPlayers}; Max Players = {mapInfo.maxPlayers}; Round Time = {mapInfo.roundTime};");
                         writer.WriteLine();
                     }
                 }
-
-                string fileContents = File.ReadAllText(path);
-                MatchCollection matches = Regex.Matches(fileContents, @"Map Name = (?<name>[^;]+); Map ID = (?<id>\d+); Min Players = (?<min>\d+); Max Players = (?<max>\d+); Round Time = (?<round>\d+);");
-
-                foreach (Match match in matches)
-                {
-                    int id = int.Parse(match.Groups["id"].Value);
-                    int minPlayers = int.Parse(match.Groups["min"].Value);
-                    int maxPlayers = int.Parse(match.Groups["max"].Value);
-
-                    switch (id)
-                    {
-                        case 3:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 7:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 15:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 20:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 32:
-                            minPlayers = 0;
-                            maxPlayers = 10;
-                            break;
-                        case 29:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 55:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 56:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 0:
-                            minPlayers = 5;
-                            maxPlayers = 40;
-                            break;
-                        case 35:
-                            minPlayers = 0;
-                            maxPlayers = 4;
-                            break;
-                        case 36:
-                            minPlayers = 0;
-                            maxPlayers = 5;
-                            break;
-                        case 18:
-                            minPlayers = 0;
-                            maxPlayers = 5;
-                            break;
-                    }
-                    fileContents = fileContents.Replace(match.Value, $"Map Name = {match.Groups["name"].Value}; Map ID = {id}; Min Players = {minPlayers}; Max Players = {maxPlayers}; Round Time = {match.Groups["round"].Value};");
-                }
-
-                File.WriteAllText(path, fileContents);
-
                 Debug.Log("File Created");
             }
             else
