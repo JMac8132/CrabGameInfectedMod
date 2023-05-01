@@ -378,26 +378,17 @@ namespace InfectedMod
             }
         }
 
-        [HarmonyPatch(typeof(LobbySettings), nameof(LobbySettings.Start))]
+        [HarmonyPatch(typeof(SteamManager), nameof(SteamManager.Start))]
         [HarmonyPostfix]
-        public static void LobbySettingsStart(LobbySettings __instance)
+        public static void SteamManagerStart()
         {
+            InitializeMapData();
             //__instance.serverNameField.text = "Infected Mod";
             //__instance.maxPlayers.slider.value = 15;
 
+            var defaultMaps = new int[] { 0, 3, 7, 15, 18, 20, 29, 32, 35, 36, 55, 56 };
             MapManager.Instance.playableMaps.Clear();
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[0]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[3]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[7]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[15]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[18]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[20]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[29]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[32]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[35]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[36]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[55]);
-            MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[56]);
+            foreach (var mapIndex in defaultMaps) MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[mapIndex]);
 
             GameModeManager.Instance.allPlayableGameModes.Clear();
             GameModeManager.Instance.allPlayableGameModes.Add(GameModeManager.Instance.allGameModes[4]);
@@ -408,13 +399,6 @@ namespace InfectedMod
             ServerConfig.field_Public_Static_Int32_8 = 4; // game over timeout
             //ServerConfig.field_Public_Static_Int32_9 = 5; // load time before kicked
             //ServerConfig.field_Public_Static_Single_0 // speak after death time
-        }
-
-        [HarmonyPatch(typeof(SteamManager), nameof(SteamManager.Start))]
-        [HarmonyPostfix]
-        public static void SteamManagerStart()
-        {
-            InitializeMapData();
         }
 
         [HarmonyPatch(typeof(SteamManager), nameof(SteamManager.Update))]
