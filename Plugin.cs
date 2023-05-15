@@ -22,6 +22,7 @@ using GameModeManager = MonoBehaviourPublicGadealGaLi1pralObInUnique;
 using MapManager = MonoBehaviourPublicObInMamaLi1plMadeMaUnique;
 using ServerConfig = ObjectPublicInSiInInInInInInInInUnique;
 using Client = ObjectPublicBoInBoCSItBoInSiBySiUnique;
+using ServerHandle = MonoBehaviourPublicPlVoUI9GaVoUI9UsPlUnique;
 
 namespace InfectedMod
 {
@@ -34,36 +35,42 @@ namespace InfectedMod
         public int roundTime;
     }
 
-    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, "1.4.0")]
+    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, "1.5.0")]
     public class Plugin : BasePlugin
     {
-        public static float gameTimer;
+        // Game state variables
         public static int gameState;
         public static int prevGameState;
         public static int prevMapID = 0;
+
+        // Timer variables
+        public static float gameTimer;
+        public static float afkTimer = 10f;
+        public static float freezeTimer = 3f;
+
+        // Player variables
         public static bool canStartGame = true;
         public static bool canAfkCheck = true;
         public static bool toggleAutoStart = true;
         public static bool toggleAfk = false;
+        public static ulong afkPlayerID;
+        public static Vector3 afkPlayerRotation;
         public static List<ulong> infectedPlayers = new();
         public static List<ulong> survivorPlayers = new();
         public static List<ulong> alivePlayers = new();
+        public static List<ulong> afkPlayers = new();
         public static ulong firstPersonInfectedID = 0;
         public static bool isInfectedPlayerFrozen = false;
         public static Vector3 firstPersonInfectedPos = Vector3.zero;
         public static string lastServerMessage;
-        public static ulong afkPlayerID;
-        public static Vector3 afkPlayerRotation;
-        public static float afkTimer = 10f;
-        public static List<ulong> afkPlayers = new();
-        public static float freezeTimer = 3f;
+
+        // Map variables
         public static Dictionary<int, MapInfo> mapDictionary = new();
         public static int randomMapID = 0;
 
         public override void Load()
         {
             Harmony.CreateAndPatchAll(typeof(Plugin));
-            Harmony.CreateAndPatchAll(typeof(bepinexDetectionPatch));
             Log.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
             Log.LogInfo("Mod created by JMac");
         }
@@ -86,8 +93,9 @@ namespace InfectedMod
                 gameState = 0;
                 prevGameState = 0;
                 lastServerMessage = "";
+                canStartGame = true;
             }
-            else if (lobbyManagerState == 2 && gameManagerState == 0 && LobbyManager.Instance.gameMode.id == 0 && gameState != 1) //Lobby
+            else if (lobbyManagerState == 2 && gameManagerState == 0 && GetModeID() == 0 && gameState != 1) //Lobby
             {
                 gameState = 1;
                 prevGameState = 1;
@@ -97,7 +105,7 @@ namespace InfectedMod
                 gameState = 2;
                 prevGameState = 2;
             }
-            else if (lobbyManagerState == 2 && gameManagerState == 0 && LobbyManager.Instance.gameMode.id != 0 && prevGameState != 1 && gameState != 3) //Frozen
+            else if (lobbyManagerState == 2 && gameManagerState == 0 && GetModeID() != 0 && prevGameState != 1 && gameState != 3) //Frozen
             {
                 gameState = 3;
                 prevGameState = 3;
@@ -181,7 +189,196 @@ namespace InfectedMod
             survivorPlayers.Remove(id);
         }
 
-        public static void CheckPosition(ulong id)
+        public static void BoundsCheck(ulong id)
+        {
+            float maxDistance = 0f;
+
+            switch (prevMapID)
+            {
+                case 0:
+                    maxDistance = 100;
+                    break;
+                case 1:
+                    maxDistance = 110;
+                    break;
+                case 2:
+                    maxDistance = 90;
+                    break;
+                case 3:
+                    maxDistance = 100;
+                    break;
+                case 5:
+                    maxDistance = 200;
+                    break;
+                case 6:
+                    maxDistance = 100;
+                    break;
+                case 7:
+                    maxDistance = 100;
+                    break;
+                case 8:
+                    maxDistance = 160;
+                    break;
+                case 9:
+                    maxDistance = 100;
+                    break;
+                case 10:
+                    maxDistance = 80;
+                    break;
+                case 11:
+                    maxDistance = 170;
+                    break;
+                case 13:
+                    maxDistance = 170;
+                    break;
+                case 14:
+                    maxDistance = 80;
+                    break;
+                case 15:
+                    maxDistance = 90;
+                    break;
+                case 17:
+                    maxDistance = 210;
+                    break;
+                case 18:
+                    maxDistance = 70;
+                    break;
+                case 19:
+                    maxDistance = 70;
+                    break;
+                case 20:
+                    maxDistance = 100;
+                    break;
+                case 21:
+                    maxDistance = 80;
+                    break;
+                case 22:
+                    maxDistance = 200;
+                    break;
+                case 23:
+                    maxDistance = 70;
+                    break;
+                case 24:
+                    maxDistance = 80;
+                    break;
+                case 25:
+                    maxDistance = 70;
+                    break;
+                case 26:
+                    maxDistance = 125;
+                    break;
+                case 27:
+                    maxDistance = 125;
+                    break;
+                case 28:
+                    maxDistance = 50;
+                    break;
+                case 29:
+                    maxDistance = 150;
+                    break;
+                case 30:
+                    maxDistance = 70;
+                    break;
+                case 31:
+                    maxDistance = 70;
+                    break;
+                case 32:
+                    maxDistance = 70;
+                    break;
+                case 33:
+                    maxDistance = 150;
+                    break;
+                case 34:
+                    maxDistance = 80;
+                    break;
+                case 35:
+                    maxDistance = 80;
+                    break;
+                case 36:
+                    maxDistance = 100;
+                    break;
+                case 37:
+                    maxDistance = 60;
+                    break;
+                case 38:
+                    maxDistance = 60;
+                    break;
+                case 39:
+                    maxDistance = 60;
+                    break;
+                case 40:
+                    maxDistance = 60;
+                    break;
+                case 41:
+                    maxDistance = 80;
+                    break;
+                case 42:
+                    maxDistance = 80;
+                    break;
+                case 43:
+                    maxDistance = 80;
+                    break;
+                case 44:
+                    maxDistance = 80;
+                    break;
+                case 45:
+                    maxDistance = 170;
+                    break;
+                case 46:
+                    maxDistance = 130;
+                    break;
+                case 47:
+                    maxDistance = 100;
+                    break;
+                case 48:
+                    maxDistance = 100;
+                    break;
+                case 49:
+                    maxDistance = 100;
+                    break;
+                case 50:
+                    maxDistance = 100;
+                    break;
+                case 51:
+                    maxDistance = 100;
+                    break;
+                case 52:
+                    maxDistance = 120;
+                    break;
+                case 53:
+                    maxDistance = 90;
+                    break;
+                case 54:
+                    maxDistance = 220;
+                    break;
+                case 55:
+                    maxDistance = 190;
+                    break;
+                case 56:
+                    maxDistance = 210;
+                    break;
+                case 57:
+                    maxDistance = 700;
+                    break;
+                case 59:
+                    maxDistance = 80;
+                    break;
+                case 60:
+                    maxDistance = 80;
+                    break;
+                case 61:
+                    maxDistance = 80;
+                    break;
+            }
+
+            if (Vector3.Distance(GetPlayerRigidBody(id).position, Vector3.zero) > maxDistance)
+            {
+                GameServer.PlayerDied(id, 1, Vector3.zero);
+                //ServerSend.RespawnPlayer(id, Vector3.zero);
+            }
+        }
+
+        public static void GlitchingCheck(ulong id)
         {
             if (prevMapID == 3)// Big Color Climb
             {
@@ -245,7 +442,7 @@ namespace InfectedMod
             {
                 Debug.Log("Trying To Create File");
 
-                Dictionary<int, (int min, int max)> mapLimits = new()
+                Dictionary<int, (int min, int max)> defaultMapSettings = new()
                 {
                     { 0,  (5, 40) },
                     { 3,  (5, 40) },
@@ -267,7 +464,7 @@ namespace InfectedMod
                     foreach (var map in mapArray)
                     {
                         int id = map.id;
-                        (int min, int max) = mapLimits.ContainsKey(id) ? mapLimits[id] : (0, 40);
+                        (int min, int max) = defaultMapSettings.GetValueOrDefault(id, (0, 40));
 
                         MapInfo mapInfo = new()
                         {
@@ -324,7 +521,7 @@ namespace InfectedMod
             GameLoop.Instance.ResetAllInventories();
             LobbyManager.Instance.started = true;
 
-            foreach (var player in GameManager.Instance.activePlayers)
+            /*foreach (var player in GameManager.Instance.activePlayers)
             {
                 Client client = LobbyManager.Instance.GetClient(player.Key);
                 if (player == null || client == null) continue;
@@ -338,7 +535,7 @@ namespace InfectedMod
                 client.field_Public_Boolean_0 = true;
             }
 
-            if (toggleAfk) LobbyManager.Instance.GetClient(GetMyID()).field_Public_Boolean_0 = false;
+            if (toggleAfk) LobbyManager.Instance.GetClient(GetMyID()).field_Public_Boolean_0 = false;*/
 
             int numOfPlayers = GetTotalNumOfPlayers();
             List<int> tempMapIDs = new();
@@ -386,8 +583,8 @@ namespace InfectedMod
             //__instance.serverNameField.text = "Infected Mod";
             //__instance.maxPlayers.slider.value = 15;
 
-            var defaultMaps = new int[] { 0, 3, 7, 15, 18, 20, 29, 32, 35, 36, 55, 56 };
             MapManager.Instance.playableMaps.Clear();
+            var defaultMaps = new int[] { 0, 3, 7, 15, 18, 20, 29, 32, 35, 36, 55, 56 };
             foreach (var mapIndex in defaultMaps) MapManager.Instance.playableMaps.Add(MapManager.Instance.maps[mapIndex]);
 
             GameModeManager.Instance.allPlayableGameModes.Clear();
@@ -395,15 +592,15 @@ namespace InfectedMod
 
             ServerConfig.field_Public_Static_Int32_5 = 6; // round start freeze
             ServerConfig.field_Public_Static_Int32_6 = 6; // round stop cinematic
-            ServerConfig.field_Public_Static_Int32_7 = 4; // round end timeout
-            ServerConfig.field_Public_Static_Int32_8 = 4; // game over timeout
+            ServerConfig.field_Public_Static_Int32_7 = 5; // round end timeout
+            ServerConfig.field_Public_Static_Int32_8 = 5; // game over timeout
             //ServerConfig.field_Public_Static_Int32_9 = 5; // load time before kicked
             //ServerConfig.field_Public_Static_Single_0 // speak after death time
         }
 
         [HarmonyPatch(typeof(SteamManager), nameof(SteamManager.Update))]
         [HarmonyPostfix]
-        public static void SteamManagerUpdate(SteamManager __instance)
+        public static void SteamManagerUpdate()
         {
             CheckGameState();
             if (!IsHost()) return;
@@ -427,99 +624,95 @@ namespace InfectedMod
         public static void GameModeUpdate(GameMode __instance)
         {
             if (!IsHost()) return;
+
             alivePlayers = GetAlivePlayers();
             gameTimer = __instance.freezeTimer.field_Private_Single_0;
+
+            if (GetModeID() != 4) return;
             CheckGameOver();
 
-            if (GetModeID() == 4)
+            if (gameState == 4)
             {
-                if (gameState == 4)
+                // Check Player Positions
+                foreach (ulong id in alivePlayers)
                 {
-                    // Check If Players Are Glitching
-                    foreach (ulong id in alivePlayers)
-                    {
-                        CheckPosition(id);
-                    }
+                    BoundsCheck(id);
+                    GlitchingCheck(id);
+                }
 
-                    // Infected Effect
-                    foreach (ulong id in infectedPlayers)
-                    {
-                        ServerSend.PlayerDamage(id, id, 0, Vector3.zero, 5);
-                    }
+                // Infected Effect
+                foreach (ulong id in infectedPlayers)
+                {
+                    ServerSend.PlayerDamage(id, id, 0, Vector3.zero, 5);
+                }
 
-                    // Pick New Infected
-                    if (infectedPlayers.Count == 0 && survivorPlayers.Count > 1)
+                // Pick New Infected
+                if (infectedPlayers.Count == 0 && survivorPlayers.Count > 1)
+                {
+                    ulong randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
+                    InfectPlayer(randomPlayer);
+                    ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[randomPlayer].username} is now infected");
+                    firstPersonInfectedID = randomPlayer;
+                    firstPersonInfectedPos = GetPlayerRigidBody(randomPlayer).position;
+                    freezeTimer = 3f;
+                    isInfectedPlayerFrozen = true;
+                    Debug.Log("Picked a new infected player");
+                }
+
+                // Freeze Infected
+                freezeTimer -= Time.deltaTime;
+                if (isInfectedPlayerFrozen)
+                {
+                    ServerSend.RespawnPlayer(firstPersonInfectedID, firstPersonInfectedPos);
+
+                    if (freezeTimer <= 0)
                     {
+                        Debug.Log("Infected Player Unfrozen");
+                        ServerSend.SendChatMessage(1, "The infected is unfrozen, RUN!");
+                        isInfectedPlayerFrozen = false;
+                    }
+                }
+
+                // Afk Check
+                afkTimer -= Time.deltaTime;
+                if (afkTimer <= 0 && canAfkCheck)
+                {
+                    if (afkPlayerRotation == GetPlayerRotation(afkPlayerID))
+                    {
+                        afkPlayers.Add(afkPlayerID);
+                        GameServer.PlayerDied(afkPlayerID, 1, Vector3.zero);
+                        ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[afkPlayerID].username} was killed for being afk");
                         ulong randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
+                        while (toggleAfk && randomPlayer == GetMyID())
+                        {
+                            randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
+                        }
                         InfectPlayer(randomPlayer);
                         ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[randomPlayer].username} is now infected");
                         firstPersonInfectedID = randomPlayer;
                         firstPersonInfectedPos = GetPlayerRigidBody(randomPlayer).position;
                         freezeTimer = 3f;
                         isInfectedPlayerFrozen = true;
-                        Debug.Log("Picked a new infected player");
+                        canAfkCheck = true;
+                        afkTimer = 10f;
+                        afkPlayerID = randomPlayer;
+                        afkPlayerRotation = GetPlayerRotation(randomPlayer);
                     }
-
-                    // Freeze Infected
-                    freezeTimer -= Time.deltaTime;
-                    if (isInfectedPlayerFrozen)
-                    {
-                        ServerSend.RespawnPlayer(firstPersonInfectedID, firstPersonInfectedPos);
-
-                        if (freezeTimer <= 0)
-                        {
-                            Debug.Log("Infected Player Unfrozen");
-                            ServerSend.SendChatMessage(1, "The infected is unfrozen, RUN!");
-                            isInfectedPlayerFrozen = false;
-                        }
-                    }
-
-                    // Afk Check
-                    afkTimer -= Time.deltaTime;
-                    if (afkTimer <= 0 && canAfkCheck)
-                    {
-                        if (afkPlayerRotation == GetPlayerRotation(afkPlayerID))
-                        {
-                            afkPlayers.Add(afkPlayerID);
-                            GameServer.PlayerDied(afkPlayerID, 1, Vector3.zero);
-                            ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[afkPlayerID].username} was killed for being afk");
-                            ulong randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
-                            while (toggleAfk && randomPlayer == GetMyID())
-                            {
-                                randomPlayer = alivePlayers[new System.Random().Next(0, alivePlayers.Count)];
-                            }
-                            InfectPlayer(randomPlayer);
-                            ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[randomPlayer].username} is now infected");
-                            firstPersonInfectedID = randomPlayer;
-                            firstPersonInfectedPos = GetPlayerRigidBody(randomPlayer).position;
-                            freezeTimer = 3f;
-                            isInfectedPlayerFrozen = true;
-                            canAfkCheck = true;
-                            afkTimer = 10f;
-                            afkPlayerID = randomPlayer;
-                            afkPlayerRotation = GetPlayerRotation(randomPlayer);
-                        }
-                        else canAfkCheck = false;
-                    }
-
-                    
-                }
-
-                if (gameState == 5 || gameState == 6)
-                {
-                    // Kill Infected End Of Round If Still Alive
-                    if (survivorPlayers.Count > 0)
-                    {
-                        foreach (ulong id in infectedPlayers)
-                        {
-                            if (!GameManager.Instance.activePlayers[id].dead)
-                            {
-                                GameServer.PlayerDied(id, 1, Vector3.zero);
-                            }
-                        }
-                    }
+                    else canAfkCheck = false;
                 }
             }
+        }
+
+        [HarmonyPatch(typeof(ServerHandle), nameof(ServerHandle.GameRequestToSpawn))]
+        [HarmonyPrefix]
+        public static void ServerHandleGameRequestToSpawn(ulong param_0)
+        {
+            if (!IsHost()) return;
+
+            if (param_0 == GetMyID() && toggleAfk) LobbyManager.Instance.GetClient(param_0).field_Public_Boolean_0 = false; // active player
+            else LobbyManager.Instance.GetClient(param_0).field_Public_Boolean_0 = true; // active player
+
+            //Debug.Log("ServerHandleGameRequestToSpawn");
         }
 
         [HarmonyPatch(typeof(GameMode), nameof(GameMode.Init))]
@@ -527,6 +720,7 @@ namespace InfectedMod
         public static void GameModeInit()
         {
             if (!IsHost() || mapDictionary[randomMapID].roundTime < 1) return;
+
             LobbyManager.Instance.gameMode.shortModeTime = mapDictionary[randomMapID].roundTime;
             LobbyManager.Instance.gameMode.longModeTime = mapDictionary[randomMapID].roundTime;
             LobbyManager.Instance.gameMode.mediumModeTime = mapDictionary[randomMapID].roundTime;
@@ -536,7 +730,7 @@ namespace InfectedMod
         [HarmonyPrefix]
         public static bool GameLoopCheckGameOver()
         {
-            if (!IsHost()) return true;
+            if (!IsHost() || GetModeID() != 4) return true;
             return false;
         }
 
@@ -544,7 +738,7 @@ namespace InfectedMod
         [HarmonyPrefix]
         public static bool GameModeTagCheckGameOver()
         {
-            if (!IsHost()) return true;
+            if (!IsHost() || GetModeID() != 4) return true;
             return false;
         }
 
@@ -554,7 +748,6 @@ namespace InfectedMod
         {
             if (!IsHost()) return true;
             return false;
-
         }
 
         [HarmonyPatch(typeof(GameLoop), nameof(GameLoop.NextGame))]
@@ -606,7 +799,11 @@ namespace InfectedMod
                 Debug.Log("Started New Game");
                 return false;
             }
-            else return true;
+            else
+            {
+                canStartGame = true;
+                return true;
+            }
         }
 
         [HarmonyPatch(typeof(GameManager), nameof(GameManager.PlayerDied))]
@@ -621,19 +818,24 @@ namespace InfectedMod
                 return;
             }
 
-            if (infectedPlayers.Contains(param_1))
-            {
-                GameServer.Instance.QueueRespawn(param_1, 3);
-            }
-            else if (!infectedPlayers.Contains(param_1))
+            if (!infectedPlayers.Contains(param_1))
             {
                 InfectPlayer(param_1);
                 ServerSend.SendChatMessage(1, $"{GameManager.Instance.activePlayers[param_1].username} died and is now infected");
-                if (survivorPlayers.Count != 0)
-                {
-                    GameServer.Instance.QueueRespawn(param_1, 3);
-                }
             }
+
+            GameServer.Instance.QueueRespawn(param_1, 3);
+
+            //respawnTimers.Add(param_1, 3);
+        }
+
+        [HarmonyPatch(typeof(ServerSend), nameof(ServerSend.RespawnPlayer))]
+        [HarmonyPrefix]
+        public static bool ServerSendRespawnPlayer(ulong param_0)
+        {
+            if (!IsHost() || GetModeID() != 4) return true;
+            if (gameState == 5 || gameState == 6) return false;
+            return true;
         }
 
         [HarmonyPatch(typeof(GameManager), nameof(GameManager.PunchPlayer))]
@@ -688,7 +890,7 @@ namespace InfectedMod
             afkPlayerID = randomPlayer;
             afkPlayerRotation = GetPlayerRotation(randomPlayer);
 
-            if (toggleAfk && alivePlayers.Count > 2 && !GameManager.Instance.activePlayers[GetMyID()].dead)
+            if (toggleAfk && alivePlayers.Count > 2 && GameManager.Instance.activePlayers.ContainsKey(GetMyID()))
             {
                 afkPlayers.Add(GetMyID());
                 survivorPlayers.Remove(GetMyID());
@@ -766,6 +968,17 @@ namespace InfectedMod
             else return true;
         }
 
+        [HarmonyPatch(typeof(ServerSend), nameof(ServerSend.SendChatMessage))]
+        [HarmonyPostfix]
+        public static void ServerSendSendChatMessagePost(string param_1)
+        {
+            string msg = param_1.ToLower();
+            if (msg == "!creator") // !creator
+            {
+                ServerSend.SendChatMessage(1, "Mod created by JMac");
+            }
+        }
+
         [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.OnPlayerJoinLeaveUpdate))]
         [HarmonyPostfix]
         public static void LobbyManagerOnPlayerJoinLeave(CSteamID param_1, bool param_2)
@@ -776,10 +989,7 @@ namespace InfectedMod
                 if (survivorPlayers.Contains(param_1.m_SteamID)) survivorPlayers.Remove(param_1.m_SteamID);
             }
         }
-    }
 
-    class bepinexDetectionPatch
-    {
         [HarmonyPatch(typeof(MonoBehaviourPublicGataInefObInUnique), "Method_Private_Void_GameObject_Boolean_Vector3_Quaternion_0")]
         [HarmonyPatch(typeof(MonoBehaviourPublicCSDi2UIInstObUIloDiUnique), "Method_Private_Void_0")]
         [HarmonyPatch(typeof(MonoBehaviourPublicVesnUnique), "Method_Private_Void_0")]
